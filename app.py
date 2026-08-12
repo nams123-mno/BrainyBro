@@ -1,29 +1,56 @@
 import os
 import streamlit as st
-from dotenv import load_dotenv
 from google import genai
 
-# Load .env file
-load_dotenv()
-
+st.set_page_config(page_title="BrainyBro AI", page_icon="🤖")
 st.title("BrainyBro AI Chatbot 🤖")
 
+# Safe Key Fetching
 API_KEY = None
 
-# 1. Check Streamlit Secrets safely (taaki Local/Codespaces par crash na ho)
+# Streamlit Secrets se key padhna
 try:
-    API_KEY = st.secrets.get("GEMINI_API_KEY")
+    if "GEMINI_API_KEY" in st.secrets:
+        API_KEY = st.secrets["GEMINI_API_KEY"]
 except Exception:
     pass
 
-# 2. Agar Secrets mein nahi mila, toh .env se uthao
+# .env file se fallback check
 if not API_KEY:
     API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 3. Agar abhi bhi key nahi mili
+# Stop condition
 if not API_KEY:
-    st.error("⚠️ API Key nahi mili! Local chala rahe hain toh .env file check karein, Streamlit Cloud par hain toh Secrets check karein.")
+    st.warning("⚠️ API Key nahi mili. Streamlit Secrets ya .env file check karein.")
     st.stop()
 
 # Initialize Client
 client = genai.Client(api_key=API_KEY)
+
+# Session state setup for chat
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display past chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Chat Input Box (Hamesha render hoga agar code st.stop tak na jaye)
+if prompt := st.chat_input("Poochiye kya poochna hai..."):
+    # Render user prompt
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generate response
+    with st.chat_message("assistant"):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
+            )
+            st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
+        except Exception as e:
+            st.error(f"Error: {e}")
