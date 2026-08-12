@@ -1,45 +1,29 @@
 import os
 import streamlit as st
-from google import genai
 from dotenv import load_dotenv
+from google import genai
 
-# Local .env file se variables load karein (local testing ke liye)
+# Load .env file
 load_dotenv()
 
-# Page Config
-st.set_page_config(page_title="Brainy Bro", page_icon="🤖")
-st.title("🤖 Brainy Bro")
+st.title("BrainyBro AI Chatbot 🤖")
 
-# Streamlit Secrets ya .env se API Key fetch karein
-API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+API_KEY = None
 
-# Client Initialize Karein
+# 1. Check Streamlit Secrets safely (taaki Local/Codespaces par crash na ho)
+try:
+    API_KEY = st.secrets.get("GEMINI_API_KEY")
+except Exception:
+    pass
+
+# 2. Agar Secrets mein nahi mila, toh .env se uthao
+if not API_KEY:
+    API_KEY = os.getenv("GEMINI_API_KEY")
+
+# 3. Agar abhi bhi key nahi mili
+if not API_KEY:
+    st.error("⚠️ API Key nahi mili! Local chala rahe hain toh .env file check karein, Streamlit Cloud par hain toh Secrets check karein.")
+    st.stop()
+
+# Initialize Client
 client = genai.Client(api_key=API_KEY)
-
-# Chat History Setup
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Purane messages screen par dikhane ke liye
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# User Input
-if user_prompt := st.chat_input("Ask to bro....."):
-    # Display User Message
-    st.chat_message("user").markdown(user_prompt)
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-
-    # Generate Response
-    with st.chat_message("assistant"):
-        with st.spinner("typing..."):
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=user_prompt,
-                )
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-            except Exception as e:
-                st.error(f"Error aaya: {e}")
